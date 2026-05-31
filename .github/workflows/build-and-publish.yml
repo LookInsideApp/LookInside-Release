@@ -54,6 +54,13 @@ jobs:
       - name: Install CocoaPods
         run: gem install cocoapods --no-document
 
+      - name: Set up signing keychain
+        id: setup_keychain
+        env:
+          KEYCHAIN_CONTENT_GZIP: ${{ secrets.KEYCHAIN_CONTENT_GZIP }}
+          KEYCHAIN_SECRET: ${{ secrets.KEYCHAIN_SECRET }}
+        run: bash Scripts/setup-ci-keychain.sh --output-file "$GITHUB_OUTPUT"
+
       - name: Determine next release version
         id: version
         env:
@@ -93,6 +100,13 @@ jobs:
           echo "Next release tag: $next_tag"
 
       - name: Build binaries and render manifest
+        env:
+          SIGNING_IDENTITY: ${{ steps.setup_keychain.outputs.signing_identity }}
+          DEVELOPMENT_TEAM: ${{ steps.setup_keychain.outputs.development_team }}
+          KEYCHAIN_PATH: ${{ steps.setup_keychain.outputs.keychain_path }}
+          KEYCHAIN_PROFILE: ${{ steps.setup_keychain.outputs.keychain_profile }}
+          KEYCHAIN_SECRET: ${{ secrets.KEYCHAIN_SECRET }}
+          REQUIRE_SIGNED_MACOS: "1"
         run: |
           if [ -n "${{ inputs.source_id }}" ]; then
             ./Scripts/build_and_publish.py \
