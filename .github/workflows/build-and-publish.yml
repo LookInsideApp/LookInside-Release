@@ -59,6 +59,12 @@ jobs:
         env:
           KEYCHAIN_CONTENT_GZIP: ${{ secrets.KEYCHAIN_CONTENT_GZIP }}
           KEYCHAIN_SECRET: ${{ secrets.KEYCHAIN_SECRET }}
+          # Keep the restored keychain as the default and in the user search
+          # list across job steps. Without this, setup-ci-keychain.sh's EXIT
+          # trap restores the runner's original keychain state when the step
+          # ends, and the next step's codesign cannot find the signing
+          # identity.
+          PRESERVE_KEYCHAIN_STATE: "1"
         run: bash Scripts/setup-ci-keychain.sh --output-file "$GITHUB_OUTPUT"
 
       - name: Determine next release version
