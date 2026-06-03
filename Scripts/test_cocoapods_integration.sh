@@ -28,6 +28,13 @@ EOF
 
 cat >"$APP_NAME/AppDelegate.swift" <<'EOF'
 import UIKit
+// LookInsideServer ships header-stripped — `import LookInsideServer`
+// resolves to an empty Clang module, so we can no longer name any of its
+// concrete types. The fixture validates two things instead:
+//   1. `import LookInsideServer` itself resolves (pod install correctly
+//      vended the binary framework + modulemap).
+//   2. The framework binary is actually linked into the app — verified
+//      at runtime by looking up the public ObjC class by name.
 import LookInsideServer
 
 @main
@@ -38,7 +45,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        _ = LookInsideServer.isLicensed
+        print("LookInsideServer class:", NSClassFromString("LookInsideServer") as Any)
 
         let window = UIWindow(frame: UIScreen.main.bounds)
         let viewController = UIViewController()
