@@ -63,6 +63,33 @@ LookInsideServer*
 
 Use the latest semver tag from this repository.
 
+## Server Logging
+
+Set logging environment variables on the app target that embeds `LookInsideServer`, for example in Xcode through **Edit Scheme** -> **Run** -> **Arguments** -> **Environment Variables**. Leave these variables unset for normal debugging sessions.
+
+### `0.2.7` and later
+
+`LOOKINSIDE_SERVER_LOG_LEVEL` controls the minimum server log level. Higher values are quieter. Missing or invalid values default to `2`.
+
+| Value | Minimum level | What prints |
+| ----- | ------------- | ----------- |
+| `0` | Debug | Debug, info, default, warning, and error logs. Enables frame-level diagnostics. |
+| `1` | Info | Info, default, warning, and error logs. Includes high-volume frame summaries. |
+| `2` | Default | Default, warning, and error logs. This is the default. |
+| `3` | Warning | Warning and error logs. |
+| `4` | Error | Error logs only. |
+
+`LOOKINSIDE_SERVER_FRAME_DEBUG` is no longer used by `0.2.7` and later.
+
+### `0.2.5` and `0.2.6`
+
+These versions do not support `LOOKINSIDE_SERVER_LOG_LEVEL`. Use `LOOKINSIDE_SERVER_FRAME_DEBUG` only when you need frame-level diagnostics.
+
+| Version | Environment variable | Enabled value |
+| ------- | -------------------- | ------------- |
+| `0.2.5` | `LOOKINSIDE_SERVER_FRAME_DEBUG` | `1`, `YES`, or `TRUE` |
+| `0.2.6` | `LOOKINSIDE_SERVER_FRAME_DEBUG` | `1` |
+
 ## License
 
 Release binaries inherit their upstream license.
