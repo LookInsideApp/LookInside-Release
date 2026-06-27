@@ -22,6 +22,8 @@ assert_contains 'GH_TOKEN: ${{ github.token }}'
 assert_contains 'token: ${{ github.token }}'
 assert_contains 'secrets.LOOKINSIDE_WEB_RELEASE_TOKEN || secrets.UPSTREAM_MIRROR_TOKEN'
 assert_contains 'LOOKINSIDE_WEB_RELEASE_TOKEN or UPSTREAM_MIRROR_TOKEN secret is required.'
+assert_contains '      - name: Validate app architectures'
+assert_contains 'for required in arm64 x86_64; do'
 assert_contains 'bash shim/Scripts/sync-auth-server-assets-to-web.sh'
 
 echo "auth server release workflow tests passed"

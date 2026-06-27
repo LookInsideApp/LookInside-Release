@@ -83,6 +83,21 @@ jobs:
           echo "app_path=$absolute_app_path" >> "$GITHUB_OUTPUT"
           echo "Extracted app: $absolute_app_path"
 
+      - name: Validate app architectures
+        run: |
+          set -euo pipefail
+          executable="${{ steps.extract.outputs.app_path }}/Contents/MacOS/lookinside-auth-server"
+          [[ -x "$executable" ]] || { echo "Missing executable: $executable" >&2; exit 1; }
+          archs="$(lipo -archs "$executable")"
+          echo "Executable architectures: $archs"
+          for required in arm64 x86_64; do
+            case " $archs " in
+              *" $required "*) ;;
+              *) echo "Missing required architecture '$required' in $executable" >&2; exit 1 ;;
+            esac
+          done
+          file "$executable"
+
       - name: Setup keychain and signing env
         id: setup_keychain
         env:
