@@ -40,7 +40,10 @@ jobs:
             echo "Release must be dispatched by the LookInside parent ledger." >&2
             exit 1
           }
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "SDK version must match X.Y.Z." >&2; exit 1; }
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+            echo "SDK version must be canonical X.Y.Z SemVer without leading zeroes." >&2
+            exit 1
+          }
           [[ "$PARENT_REF" == "refs/tags/release/sdk/$VERSION" ]] || {
             echo "Parent ref does not match the SDK release version." >&2
             exit 1
@@ -72,7 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --force --tags origin
-          latest_tag="$(git tag --list --sort=-version:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)"
+          latest_tag="$(git tag --list --sort=-version:refname | grep -E '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' | head -n 1)"
           python3 - "$latest_tag" "$VERSION" <<'PY'
           import sys
 

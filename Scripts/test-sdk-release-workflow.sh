@@ -22,5 +22,6 @@ assert_contains '--source-ref "${{ steps.context.outputs.source_ref }}"'
 assert_contains 'refs/tags/release/sdk/$VERSION'
 assert_contains 'git push origin HEAD:main "$VERSION"'
 assert_contains 'Built from LookInside-Server@$SOURCE_REF'
+assert_contains 'without leading zeroes'
 
 echo "SDK release workflow tests passed"
