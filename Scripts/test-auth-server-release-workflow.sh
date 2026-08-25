@@ -28,5 +28,10 @@ assert_contains 'ref: ${{ needs.prepare.outputs.release_ref }}'
 assert_contains '      - name: Validate app architectures'
 assert_contains 'for required in arm64 x86_64; do'
 assert_contains 'MARKETING_VERSION: ${{ needs.prepare.outputs.version }}'
+assert_contains '      - name: Tag published Auth source'
+assert_contains 'AUTH_REF: ${{ needs.prepare.outputs.source_ref }}'
+assert_contains 'repos/$AUTH_REPOSITORY/commits/$VERSION'
+assert_contains '-f ref="refs/tags/$VERSION"'
+assert_contains 'Published Auth tag $VERSION does not resolve to $AUTH_REF.'
 
 echo "auth server release workflow tests passed"

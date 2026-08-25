@@ -196,3 +196,32 @@ jobs:
           gh release upload storage "$version_asset" \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
+
+      - name: Tag published Auth source
+        env:
+          GH_TOKEN: ${{ secrets.LOOKINSIDE_WEB_RELEASE_TOKEN || secrets.UPSTREAM_MIRROR_TOKEN }}
+          AUTH_REPOSITORY: ${{ secrets.AUTH_SOURCE_REPO }}
+          AUTH_REF: ${{ needs.prepare.outputs.source_ref }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          [[ -n "$GH_TOKEN" ]] || { echo "Cross-repository release token is required." >&2; exit 1; }
+          [[ -n "$AUTH_REPOSITORY" ]] || { echo "AUTH_SOURCE_REPO is required." >&2; exit 1; }
+
+          existing_ref="$(gh api "repos/$AUTH_REPOSITORY/commits/$VERSION" --jq .sha 2>/dev/null || true)"
+          if [[ -n "$existing_ref" ]]; then
+            [[ "$existing_ref" == "$AUTH_REF" ]] || {
+              echo "Auth tag $VERSION already targets $existing_ref instead of $AUTH_REF." >&2
+              exit 1
+            }
+          else
+            gh api --method POST "repos/$AUTH_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$VERSION" \
+              -f sha="$AUTH_REF" >/dev/null
+          fi
+
+          published_ref="$(gh api "repos/$AUTH_REPOSITORY/commits/$VERSION" --jq .sha)"
+          [[ "$published_ref" == "$AUTH_REF" ]] || {
+            echo "Published Auth tag $VERSION does not resolve to $AUTH_REF." >&2
+            exit 1
+          }
