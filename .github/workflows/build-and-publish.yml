@@ -1,16 +1,10 @@
 name: Build and Publish
+run-name: ${{ github.event.client_payload.release_id }}
 
 on:
-  workflow_dispatch:
-    inputs:
-      source_id:
-        description: Optional source id to build (e.g. "swiftui-support")
-        required: false
-        type: string
-      version:
-        description: Explicit X.Y.Z release tag. Defaults to latest patch + 1.
-        required: false
-        type: string
+  repository_dispatch:
+    types:
+      - parent-sdk-release
 
 concurrency:
   group: build-and-publish-main
@@ -21,9 +15,7 @@ permissions:
 
 jobs:
   build:
-    # Pin the runner image so toolchain availability stays predictable.
-    # macos-26-arm64 ships Xcode 26.x preinstalled, matching the local
-    # build environment.
+    if: github.actor == 'Lakr233'
     runs-on: macos-26
     timeout-minutes: 90
     env:
@@ -33,6 +25,40 @@ jobs:
       UPSTREAM_SERVER_REPO_URL: ${{ secrets.UPSTREAM_SERVER_REPO_URL }}
 
     steps:
+      - name: Validate Parent Release Context
+        id: context
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.event.client_payload.version }}"
+          SOURCE_REF="${{ github.event.client_payload.source_ref }}"
+          PARENT_REPOSITORY="${{ github.event.client_payload.parent_repository }}"
+          PARENT_REF="${{ github.event.client_payload.parent_ref }}"
+          PARENT_SHA="${{ github.event.client_payload.parent_sha }}"
+          RELEASE_ID="${{ github.event.client_payload.release_id }}"
+
+          [[ "$PARENT_REPOSITORY" == "LookInsideApp/LookInside-MonoRepo" ]] || {
+            echo "Release must be dispatched by the LookInside parent ledger." >&2
+            exit 1
+          }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "SDK version must match X.Y.Z." >&2; exit 1; }
+          [[ "$PARENT_REF" == "refs/tags/release/sdk/$VERSION" ]] || {
+            echo "Parent ref does not match the SDK release version." >&2
+            exit 1
+          }
+          [[ "$PARENT_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid parent SHA." >&2; exit 1; }
+          [[ "$SOURCE_REF" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid Server source SHA." >&2; exit 1; }
+          [[ "$RELEASE_ID" == "release/sdk/$VERSION@$PARENT_SHA/sdk" ]] || {
+            echo "Release id does not identify the parent tag and commit." >&2
+            exit 1
+          }
+
+          {
+            echo "version=$VERSION"
+            echo "source_ref=$SOURCE_REF"
+            echo "parent_ref=$PARENT_REF"
+            echo "parent_sha=$PARENT_SHA"
+          } >>"$GITHUB_OUTPUT"
+
       - name: Check out repository
         uses: actions/checkout@v4
         with:
@@ -40,9 +66,27 @@ jobs:
           token: ${{ secrets.UPSTREAM_MIRROR_TOKEN }}
           fetch-depth: 0
 
+      - name: Validate Release Version
+        env:
+          VERSION: ${{ steps.context.outputs.version }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          latest_tag="$(git tag --list --sort=-version:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)"
+          python3 - "$latest_tag" "$VERSION" <<'PY'
+          import sys
+
+          latest, requested = sys.argv[1:]
+          current = tuple(int(part) for part in requested.split("."))
+          if latest and current <= tuple(int(part) for part in latest.split(".")):
+              raise SystemExit(f"SDK version {requested} must be greater than latest tag {latest}.")
+          PY
+          if git rev-parse --verify --quiet "refs/tags/$VERSION"; then
+            echo "SDK tag $VERSION already exists." >&2
+            exit 1
+          fi
+
       - name: Select Xcode
-        # Xcode 26.4.1 matches the locally verified xcframework build and
-        # is preinstalled on the macos-26 runner image.
         run: |
           sudo xcode-select -s /Applications/Xcode_26.4.1.app/Contents/Developer
           xcodebuild -version
@@ -59,53 +103,10 @@ jobs:
         env:
           KEYCHAIN_CONTENT_GZIP: ${{ secrets.KEYCHAIN_CONTENT_GZIP }}
           KEYCHAIN_SECRET: ${{ secrets.KEYCHAIN_SECRET }}
-          # Keep the restored keychain as the default and in the user search
-          # list across job steps. Without this, setup-ci-keychain.sh's EXIT
-          # trap restores the runner's original keychain state when the step
-          # ends, and the next step's codesign cannot find the signing
-          # identity.
           PRESERVE_KEYCHAIN_STATE: "1"
         run: bash Scripts/setup-ci-keychain.sh --output-file "$GITHUB_OUTPUT"
 
-      - name: Determine next release version
-        id: version
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          git fetch --force --tags origin
-          latest_tag="$(git tag --list --sort=-version:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)"
-          next_tag="$(python3 - "$latest_tag" <<'PY'
-          import os
-          import re
-          import sys
-
-          latest = sys.argv[1]
-          override = os.environ.get("INPUT_VERSION", "").strip()
-
-          if override:
-              if not re.fullmatch(r"\d+\.\d+\.\d+", override):
-                  sys.exit(f"Invalid version override: {override!r}. Expected X.Y.Z.")
-              if latest:
-                  l_major, l_minor, l_patch = (int(p) for p in latest.split("."))
-                  o_major, o_minor, o_patch = (int(p) for p in override.split("."))
-                  if (o_major, o_minor, o_patch) <= (l_major, l_minor, l_patch):
-                      sys.exit(f"Version override {override} must be greater than latest tag {latest}.")
-              print(override)
-              raise SystemExit
-
-          if not latest:
-              print("0.1.0")
-              raise SystemExit
-
-          major, minor, patch = (int(part) for part in latest.split("."))
-          print(f"{major}.{minor}.{patch + 1}")
-          PY
-          )"
-          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
-          echo "next_tag=$next_tag" >> "$GITHUB_OUTPUT"
-          echo "Next release tag: $next_tag"
-
-      - name: Build binaries and render manifest
+      - name: Build Pinned Binary and Render Manifest
         env:
           SIGNING_IDENTITY: ${{ steps.setup_keychain.outputs.signing_identity }}
           DEVELOPMENT_TEAM: ${{ steps.setup_keychain.outputs.development_team }}
@@ -114,44 +115,42 @@ jobs:
           KEYCHAIN_SECRET: ${{ secrets.KEYCHAIN_SECRET }}
           REQUIRE_SIGNED_MACOS: "1"
         run: |
-          if [ -n "${{ inputs.source_id }}" ]; then
-            ./Scripts/build_and_publish.py \
-              --release-tag "${{ steps.version.outputs.next_tag }}" \
-              --source "${{ inputs.source_id }}"
-          else
-            ./Scripts/build_and_publish.py \
-              --release-tag "${{ steps.version.outputs.next_tag }}"
-          fi
+          ./Scripts/build_and_publish.py \
+            --release-tag "${{ steps.context.outputs.version }}" \
+            --source lookinside-server \
+            --source-ref "${{ steps.context.outputs.source_ref }}"
 
-      - name: Commit updated manifest
-        id: commit
+      - name: Commit Manifest and Create Tag
+        env:
+          VERSION: ${{ steps.context.outputs.version }}
         run: |
+          set -euo pipefail
           if git diff --quiet -- Package.swift Tests LookInsideServer.podspec; then
-            echo "No manifest changes to commit."
-            echo "created_commit=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "Pinned SDK build produced no release manifest change." >&2
+            exit 1
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Package.swift Tests LookInsideServer.podspec
-          git commit -m "Build and publish ${{ steps.version.outputs.next_tag }}"
-          git tag "${{ steps.version.outputs.next_tag }}"
-          git push origin HEAD:main "${{ steps.version.outputs.next_tag }}"
-          echo "created_commit=true" >> "$GITHUB_OUTPUT"
+          git commit -m "Build and publish $VERSION"
+          git tag "$VERSION"
+          git push origin HEAD:main "$VERSION"
 
-      - name: Publish version release
-        if: steps.commit.outputs.created_commit == 'true'
+      - name: Publish Version Release
+        env:
+          VERSION: ${{ steps.context.outputs.version }}
+          SOURCE_REF: ${{ steps.context.outputs.source_ref }}
+          PARENT_REF: ${{ steps.context.outputs.parent_ref }}
+          PARENT_SHA: ${{ steps.context.outputs.parent_sha }}
         run: |
-          gh release create "${{ steps.version.outputs.next_tag }}" \
+          gh release create "$VERSION" \
             --verify-tag \
-            --title "${{ steps.version.outputs.next_tag }}" \
-            --notes "SwiftPM and CocoaPods release ${{ steps.version.outputs.next_tag }}." \
+            --title "$VERSION" \
+            --notes "Built from LookInside-Server@$SOURCE_REF via $PARENT_REF@$PARENT_SHA." \
             build/release-assets/*.zip
 
       - name: Lint CocoaPods podspec
-        if: steps.commit.outputs.created_commit == 'true'
         run: pod spec lint LookInsideServer.podspec --allow-warnings
 
       - name: Build CocoaPods integration fixture
-        if: steps.commit.outputs.created_commit == 'true'
-        run: Scripts/test_cocoapods_integration.sh "${{ steps.version.outputs.next_tag }}"
+        run: Scripts/test_cocoapods_integration.sh "${{ steps.context.outputs.version }}"

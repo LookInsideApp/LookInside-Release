@@ -1,18 +1,10 @@
 name: Build and Publish Auth Server
+run-name: ${{ github.event.client_payload.release_id }}
 
 on:
-  workflow_dispatch:
-    inputs:
-      source_ref:
-        description: Git ref (branch, tag, or SHA) of the auth helper source repo to build.
-        required: true
-        type: string
-        default: main
-      output_asset:
-        description: Signed asset file name to upload to the storage release.
-        required: true
-        type: string
-        default: lookinside-auth-server.app.zip
+  repository_dispatch:
+    types:
+      - parent-auth-release
 
 permissions:
   contents: write
@@ -22,7 +14,56 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prepare:
+    if: github.actor == 'Lakr233'
+    runs-on: ubuntu-latest
+    outputs:
+      source_ref: ${{ steps.context.outputs.source_ref }}
+      version: ${{ steps.context.outputs.version }}
+      parent_ref: ${{ steps.context.outputs.parent_ref }}
+      parent_sha: ${{ steps.context.outputs.parent_sha }}
+      release_ref: ${{ steps.context.outputs.release_ref }}
+
+    steps:
+      - name: Validate Parent Release Context
+        id: context
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.event.client_payload.version }}"
+          SOURCE_REF="${{ github.event.client_payload.source_ref }}"
+          RELEASE_REF="${{ github.event.client_payload.release_ref }}"
+          PARENT_REPOSITORY="${{ github.event.client_payload.parent_repository }}"
+          PARENT_REF="${{ github.event.client_payload.parent_ref }}"
+          PARENT_SHA="${{ github.event.client_payload.parent_sha }}"
+          RELEASE_ID="${{ github.event.client_payload.release_id }}"
+
+          [[ "$PARENT_REPOSITORY" == "LookInsideApp/LookInside-MonoRepo" ]] || {
+            echo "Release must be dispatched by the LookInside parent ledger." >&2
+            exit 1
+          }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "App version must match X.Y.Z." >&2; exit 1; }
+          [[ "$PARENT_REF" == "refs/tags/release/app/$VERSION" ]] || {
+            echo "Parent ref does not match the app release version." >&2
+            exit 1
+          }
+          [[ "$PARENT_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid parent SHA." >&2; exit 1; }
+          [[ "$SOURCE_REF" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid Auth source SHA." >&2; exit 1; }
+          [[ "$RELEASE_REF" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid Release source SHA." >&2; exit 1; }
+          [[ "$RELEASE_ID" == "release/app/$VERSION@$PARENT_SHA/auth" ]] || {
+            echo "Release id does not identify the parent tag and commit." >&2
+            exit 1
+          }
+
+          {
+            echo "source_ref=$SOURCE_REF"
+            echo "version=$VERSION"
+            echo "parent_ref=$PARENT_REF"
+            echo "parent_sha=$PARENT_SHA"
+            echo "release_ref=$RELEASE_REF"
+          } >>"$GITHUB_OUTPUT"
+
   build_and_sign:
+    needs: prepare
     runs-on: macos-latest
     timeout-minutes: 60
     env:
@@ -33,7 +74,7 @@ jobs:
       - name: Checkout shim repository
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ needs.prepare.outputs.release_ref }}
           path: shim
           token: ${{ github.token }}
 
@@ -41,7 +82,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ secrets.AUTH_SOURCE_REPO }}
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ needs.prepare.outputs.source_ref }}
           path: authenticator
           token: ${{ secrets.LOOKINSIDE_WEB_RELEASE_TOKEN || secrets.UPSTREAM_MIRROR_TOKEN }}
 
@@ -57,18 +98,19 @@ jobs:
           mise trust
           mise install
 
-      - name: Compute build timestamp
-        id: stamp
+      - name: Validate Pinned Auth Source
+        working-directory: authenticator
         run: |
           set -euo pipefail
-          stamp="$(date -u +%Y.%m%d.%H%M%S)"
-          echo "marketing_version=$stamp" >> "$GITHUB_OUTPUT"
-          echo "Build timestamp: $stamp"
+          [[ "$(git rev-parse HEAD)" == "${{ needs.prepare.outputs.source_ref }}" ]] || {
+            echo "Authenticator checkout does not match the pinned parent source." >&2
+            exit 1
+          }
 
       - name: Build unsigned auth server app
         working-directory: authenticator
         env:
-          MARKETING_VERSION: ${{ steps.stamp.outputs.marketing_version }}
+          MARKETING_VERSION: ${{ needs.prepare.outputs.version }}
         run: make app
 
       - name: Extract app bundle
@@ -115,7 +157,7 @@ jobs:
         run: |
           bash shim/Scripts/sign-and-notarize-app.sh \
             --app "${{ steps.extract.outputs.app_path }}" \
-            --output "build/signed/${{ inputs.output_asset }}"
+            --output "build/signed/lookinside-auth-server.app.zip"
 
       - name: Ensure storage release exists
         working-directory: shim
@@ -130,7 +172,7 @@ jobs:
 
       - name: Upload signed app
         run: |
-          gh release upload storage "build/signed/${{ inputs.output_asset }}" \
+          gh release upload storage "build/signed/lookinside-auth-server.app.zip" \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
 
@@ -138,60 +180,19 @@ jobs:
         run: |
           set -euo pipefail
           cd build/signed
-          shasum -a 256 "${{ inputs.output_asset }}" > "${{ inputs.output_asset }}.sha256"
-          gh release upload storage "${{ inputs.output_asset }}.sha256" \
+          shasum -a 256 lookinside-auth-server.app.zip > lookinside-auth-server.app.zip.sha256
+          gh release upload storage lookinside-auth-server.app.zip.sha256 \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
 
       - name: Upload version marker
         env:
-          MARKETING_VERSION: ${{ steps.stamp.outputs.marketing_version }}
+          MARKETING_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set -euo pipefail
           cd build/signed
-          version_asset="${{ inputs.output_asset }}.version"
+          version_asset="lookinside-auth-server.app.zip.version"
           printf '%s\n' "$MARKETING_VERSION" > "$version_asset"
           gh release upload storage "$version_asset" \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
-
-      - name: Validate Web Publishing Secret
-        env:
-          LOOKINSIDE_WEB_RELEASE_TOKEN: ${{ secrets.LOOKINSIDE_WEB_RELEASE_TOKEN || secrets.UPSTREAM_MIRROR_TOKEN }}
-        run: |
-          set -euo pipefail
-          [[ -n "$LOOKINSIDE_WEB_RELEASE_TOKEN" ]] || { echo "LOOKINSIDE_WEB_RELEASE_TOKEN or UPSTREAM_MIRROR_TOKEN secret is required." >&2; exit 1; }
-
-      - name: Checkout web repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ secrets.WEB_TARGET_REPO }}
-          ref: main
-          path: web
-          token: ${{ secrets.LOOKINSIDE_WEB_RELEASE_TOKEN || secrets.UPSTREAM_MIRROR_TOKEN }}
-
-      - name: Sync signed app metadata to web
-        env:
-          ASSET_DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases/download/storage/${{ inputs.output_asset }}
-        run: |
-          set -euo pipefail
-          bash shim/Scripts/sync-auth-server-assets-to-web.sh \
-            --web-dir web \
-            --asset "build/signed/${{ inputs.output_asset }}" \
-            --url "$ASSET_DOWNLOAD_URL"
-
-      - name: Commit web auth server manifest update
-        working-directory: web
-        env:
-          MARKETING_VERSION: ${{ steps.stamp.outputs.marketing_version }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/downloads/manifest.json public/downloads/auth-server
-          if git diff --cached --quiet; then
-            echo "No Web auth server changes to publish."
-            exit 0
-          fi
-          git commit -m "Publish Auth Server $MARKETING_VERSION"
-          git push origin HEAD:main

@@ -16,14 +16,17 @@ assert_contains() {
 	grep -F -- "$needle" "$WORKFLOW_PATH" >/dev/null
 }
 
-assert_contains '      - name: Validate Web Publishing Secret'
 assert_contains '        with:'
+assert_contains 'parent-auth-release'
+assert_contains 'run-name: ${{ github.event.client_payload.release_id }}'
+assert_contains 'SOURCE_REF="${{ github.event.client_payload.source_ref }}"'
+assert_contains 'refs/tags/release/app/$VERSION'
 assert_contains 'GH_TOKEN: ${{ github.token }}'
 assert_contains 'token: ${{ github.token }}'
-assert_contains 'secrets.LOOKINSIDE_WEB_RELEASE_TOKEN || secrets.UPSTREAM_MIRROR_TOKEN'
-assert_contains 'LOOKINSIDE_WEB_RELEASE_TOKEN or UPSTREAM_MIRROR_TOKEN secret is required.'
+assert_contains 'RELEASE_REF="${{ github.event.client_payload.release_ref }}"'
+assert_contains 'ref: ${{ needs.prepare.outputs.release_ref }}'
 assert_contains '      - name: Validate app architectures'
 assert_contains 'for required in arm64 x86_64; do'
-assert_contains 'bash shim/Scripts/sync-auth-server-assets-to-web.sh'
+assert_contains 'MARKETING_VERSION: ${{ needs.prepare.outputs.version }}'
 
 echo "auth server release workflow tests passed"

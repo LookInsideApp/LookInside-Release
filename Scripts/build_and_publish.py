@@ -58,10 +58,17 @@ def resolve_source_repo(source):
     raise SystemExit(f"Source {source['id']!r} has no repository or repositoryEnv field.")
 
 
-def build_archive(source, *, token, workdir):
+def build_archive(source, *, token, workdir, source_ref=None):
     src_dir = workdir / source["id"]
     repo_url = resolve_source_repo(source)
     run(["git", "clone", "--quiet", authed_clone_url(repo_url, token), str(src_dir)])
+    if source_ref:
+        run(["git", "checkout", "--detach", source_ref], cwd=src_dir)
+        resolved_ref = run(["git", "rev-parse", "HEAD"], cwd=src_dir, capture=True)
+        if resolved_ref != source_ref:
+            raise SystemExit(
+                f"Source {source['id']!r} resolved to {resolved_ref}, expected {source_ref}."
+            )
     raw_log = workdir / f"{source['id']}-build.log"
     build_cmd = (
         f'set -o pipefail; '
@@ -143,6 +150,10 @@ def main():
     )
     parser.add_argument("--source", action="append", dest="source_ids",
                         help="Only build the given source id. Repeatable.")
+    parser.add_argument(
+        "--source-ref",
+        help="Exact commit SHA to check out. Valid only when building one source.",
+    )
     args = parser.parse_args()
 
     sources = json.loads(SOURCES_PATH.read_text())
@@ -151,6 +162,11 @@ def main():
         sources = [s for s in sources if s["id"] in wanted]
         if not sources:
             raise SystemExit(f"No matching sources for {sorted(wanted)}")
+    if args.source_ref:
+        if not re.fullmatch(r"[0-9a-f]{40}", args.source_ref):
+            raise SystemExit("--source-ref must be a full lowercase commit SHA.")
+        if len(sources) != 1:
+            raise SystemExit("--source-ref requires exactly one selected source.")
 
     mirror_repo = repo_name()
     token = os.environ.get("UPSTREAM_MIRROR_TOKEN") or os.environ.get("GH_TOKEN")
@@ -167,7 +183,12 @@ def main():
 
         for source in sources:
             print(f"==> {source['id']}", flush=True)
-            archive = build_archive(source, token=token, workdir=workdir)
+            archive = build_archive(
+                source,
+                token=token,
+                workdir=workdir,
+                source_ref=args.source_ref,
+            )
             sha = checksum(archive)
             name = source.get("assetName", archive.name)
             asset_path = asset_output_dir / name
