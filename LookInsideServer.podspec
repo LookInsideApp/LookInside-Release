@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name = "LookInsideServer"
-  s.version = "0.2.8"
+  s.version = "0.2.9"
   s.summary = "LookInside runtime server for debuggable iOS and macOS apps."
   s.homepage = "https://github.com/LookInsideApp/LookInside-Release"
   s.license = { :type => "MIT" }
@@ -12,8 +12,8 @@ Pod::Spec.new do |s|
   s.vendored_frameworks = "LookInsideServer.xcframework"
   s.prepare_command = <<-CMD
 set -eu
-curl -L -o LookInsideServer.xcframework.zip "https://github.com/LookInsideApp/LookInside-Release/releases/download/0.2.8/LookInsideServer.xcframework.zip"
-echo "645ae9428eac83048d301dfb879072a2d2fed2e1f8d3f54d8a3d3a3e085aed8f  LookInsideServer.xcframework.zip" | shasum -a 256 -c -
+curl -L -o LookInsideServer.xcframework.zip "https://github.com/LookInsideApp/LookInside-Release/releases/download/0.2.9/LookInsideServer.xcframework.zip"
+echo "f5adb484bd6c1bef88981c4a1d845d3d5452a4be03e41298b8516352d17debad  LookInsideServer.xcframework.zip" | shasum -a 256 -c -
 rm -rf LookInsideServer.xcframework
 ditto -x -k LookInsideServer.xcframework.zip .
 rm LookInsideServer.xcframework.zip

@@ -17,8 +17,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "LookInsideServer",
-            url: "https://github.com/LookInsideApp/LookInside-Release/releases/download/0.2.8/LookInsideServer.xcframework.zip",
-            checksum: "645ae9428eac83048d301dfb879072a2d2fed2e1f8d3f54d8a3d3a3e085aed8f"
+            url: "https://github.com/LookInsideApp/LookInside-Release/releases/download/0.2.9/LookInsideServer.xcframework.zip",
+            checksum: "f5adb484bd6c1bef88981c4a1d845d3d5452a4be03e41298b8516352d17debad"
         ),
         .testTarget(
             name: "LookInsideReleaseLookInsideServerTests",
