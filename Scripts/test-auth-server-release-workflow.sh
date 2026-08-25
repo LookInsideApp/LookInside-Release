@@ -31,7 +31,13 @@ assert_contains 'MARKETING_VERSION: ${{ needs.prepare.outputs.version }}'
 assert_contains '      - name: Tag published Auth source'
 assert_contains 'AUTH_REF: ${{ needs.prepare.outputs.source_ref }}'
 assert_contains 'repos/$AUTH_REPOSITORY/commits/$VERSION'
+assert_contains 'if existing_ref="$(gh api'
 assert_contains '-f ref="refs/tags/$VERSION"'
 assert_contains 'Published Auth tag $VERSION does not resolve to $AUTH_REF.'
+
+if grep -F -- '2>/dev/null || true' "$WORKFLOW_PATH" >/dev/null; then
+	echo "missing-tag API failure must branch on command status, not capture its error body" >&2
+	exit 1
+fi
 
 echo "auth server release workflow tests passed"

@@ -208,8 +208,7 @@ jobs:
           [[ -n "$GH_TOKEN" ]] || { echo "Cross-repository release token is required." >&2; exit 1; }
           [[ -n "$AUTH_REPOSITORY" ]] || { echo "AUTH_SOURCE_REPO is required." >&2; exit 1; }
 
-          existing_ref="$(gh api "repos/$AUTH_REPOSITORY/commits/$VERSION" --jq .sha 2>/dev/null || true)"
-          if [[ -n "$existing_ref" ]]; then
+          if existing_ref="$(gh api "repos/$AUTH_REPOSITORY/commits/$VERSION" --jq .sha 2>/dev/null)"; then
             [[ "$existing_ref" == "$AUTH_REF" ]] || {
               echo "Auth tag $VERSION already targets $existing_ref instead of $AUTH_REF." >&2
               exit 1
