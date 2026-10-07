@@ -29,4 +29,15 @@ assert_contains 'without leading zeroes'
 assert_contains 'bash Scripts/run-gitleaks.sh .'
 assert_contains 'bash Scripts/scan-private-keys.sh "${assets[@]}"'
 
+# The Auth helper is no longer built or published by this repository.
+if [[ -e "$root_dir/.github/workflows/sign-auth-server.yml" ]]; then
+	echo "the retired Auth helper workflow is still present" >&2
+	exit 1
+fi
+if grep -rlE --exclude=test-sdk-release-workflow.sh 'auth-server|parent-auth-release' "$root_dir/.github" "$root_dir/Scripts" "$root_dir/Makefile" >/dev/null; then
+	echo "release tooling still references the retired Auth helper:" >&2
+	grep -rlE --exclude=test-sdk-release-workflow.sh 'auth-server|parent-auth-release' "$root_dir/.github" "$root_dir/Scripts" "$root_dir/Makefile" >&2
+	exit 1
+fi
+
 echo "SDK release workflow tests passed"
