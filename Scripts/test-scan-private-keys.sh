@@ -24,12 +24,12 @@ ssh-keygen -q -t ed25519 -N "" -C scan-test -f "$keys/openssh" >/dev/null
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out "$keys/rsa4096.pem" 2>/dev/null
 openssl genpkey -algorithm ED25519 -out "$keys/ed25519.pem" 2>/dev/null
 # DER forms of the same keys, as an app or a script could embed them.
-openssl pkey -in "$keys/pkcs8.pem" -outform DER -out "$keys/pkcs8.der" 2>/dev/null
+openssl pkcs8 -topk8 -nocrypt -in "$keys/pkcs8.pem" -outform DER -out "$keys/pkcs8.der" 2>/dev/null
 openssl pkey -in "$keys/pkcs8.pem" -traditional -outform DER -out "$keys/pkcs1.der" 2>/dev/null
-openssl pkey -in "$keys/ec-pkcs8.pem" -outform DER -out "$keys/ec-pkcs8.der" 2>/dev/null
+openssl pkcs8 -topk8 -nocrypt -in "$keys/ec-pkcs8.pem" -outform DER -out "$keys/ec-pkcs8.der" 2>/dev/null
 openssl pkey -in "$keys/ec-pkcs8.pem" -traditional -outform DER -out "$keys/ec.der" 2>/dev/null
 openssl pkey -in "$keys/ed25519.pem" -outform DER -out "$keys/ed25519.der" 2>/dev/null
-openssl pkey -in "$keys/rsa4096.pem" -outform DER -out "$keys/rsa4096.der" 2>/dev/null
+openssl pkcs8 -topk8 -nocrypt -in "$keys/rsa4096.pem" -outform DER -out "$keys/rsa4096.der" 2>/dev/null
 openssl pkcs8 -topk8 -in "$keys/pkcs8.pem" -passout pass:throwaway -outform DER -out "$keys/encrypted.der" 2>/dev/null
 openssl pkey -in "$keys/pkcs8.pem" -pubout -outform DER -out "$keys/public.der" 2>/dev/null
 openssl x509 -in "$keys/cert.pem" -outform DER -out "$keys/cert.der" 2>/dev/null
