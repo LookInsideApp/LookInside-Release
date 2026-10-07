@@ -16,7 +16,7 @@ permissions:
 jobs:
   build:
     if: github.actor == 'Lakr233'
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 90
     env:
       GH_TOKEN: ${{ secrets.UPSTREAM_MIRROR_TOKEN }}
@@ -30,6 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ github.event.client_payload.version }}"
+          BUILD_NUMBER="${{ github.event.client_payload.build_number }}"
           SOURCE_REF="${{ github.event.client_payload.source_ref }}"
           PARENT_REPOSITORY="${{ github.event.client_payload.parent_repository }}"
           PARENT_REF="${{ github.event.client_payload.parent_ref }}"
@@ -42,6 +43,10 @@ jobs:
           }
           [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
             echo "SDK version must be canonical X.Y.Z SemVer without leading zeroes." >&2
+            exit 1
+          }
+          [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || {
+            echo "SDK build number must be a positive decimal integer resolved by the parent ledger." >&2
             exit 1
           }
           [[ "$PARENT_REF" == "refs/tags/release/sdk/$VERSION" ]] || {
@@ -57,6 +62,7 @@ jobs:
 
           {
             echo "version=$VERSION"
+            echo "build_number=$BUILD_NUMBER"
             echo "source_ref=$SOURCE_REF"
             echo "parent_ref=$PARENT_REF"
             echo "parent_sha=$PARENT_SHA"
@@ -68,6 +74,9 @@ jobs:
           ref: main
           token: ${{ secrets.UPSTREAM_MIRROR_TOKEN }}
           fetch-depth: 0
+
+      - name: Scan Repository For Secrets
+        run: bash Scripts/run-gitleaks.sh .
 
       - name: Validate Release Version
         env:
@@ -91,7 +100,7 @@ jobs:
 
       - name: Select Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_26.4.1.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
           xcodebuild -version
           swift --version
 
@@ -117,13 +126,25 @@ jobs:
           KEYCHAIN_PROFILE: ${{ steps.setup_keychain.outputs.keychain_profile }}
           KEYCHAIN_SECRET: ${{ secrets.KEYCHAIN_SECRET }}
           REQUIRE_SIGNED_MACOS: "1"
+          # The version tuple the parent resolved at its tag; package-xcframework.sh
+          # compiles it into the 220 LicenseChallenge reply.
+          SERVER_MARKETING_VERSION: ${{ steps.context.outputs.version }}
+          SERVER_BUILD_NUMBER: ${{ steps.context.outputs.build_number }}
         run: |
           ./Scripts/build_and_publish.py \
             --release-tag "${{ steps.context.outputs.version }}" \
             --source lookinside-server \
             --source-ref "${{ steps.context.outputs.source_ref }}"
 
-      - name: Commit Manifest and Create Tag
+      - name: Scan Release Assets For Private Keys
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(build/release-assets/*.zip)
+          [[ ${#assets[@]} -gt 0 ]] || { echo "No release assets to scan." >&2; exit 1; }
+          bash Scripts/scan-private-keys.sh "${assets[@]}"
+
+      - name: Commit Manifest
         env:
           VERSION: ${{ steps.context.outputs.version }}
         run: |
@@ -136,6 +157,25 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Package.swift Tests LookInsideServer.podspec
           git commit -m "Build and publish $VERSION"
+
+      # build_and_publish.py rewrote the files committed above, so the scans
+      # run on the local release commit, before anything is tagged or pushed.
+      - name: Scan Release Commit For Secrets
+        run: |
+          set -euo pipefail
+          committed=()
+          while IFS= read -r path; do
+            committed+=("$path")
+          done < <(git diff --name-only --diff-filter=d HEAD~1 HEAD)
+          [[ ${#committed[@]} -gt 0 ]] || { echo "Release commit changes no files." >&2; exit 1; }
+          bash Scripts/scan-private-keys.sh "${committed[@]}"
+          bash Scripts/run-gitleaks.sh .
+
+      - name: Create Tag and Push
+        env:
+          VERSION: ${{ steps.context.outputs.version }}
+        run: |
+          set -euo pipefail
           git tag "$VERSION"
           git push origin HEAD:main "$VERSION"
 

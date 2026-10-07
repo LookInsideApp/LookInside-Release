@@ -18,10 +18,15 @@ assert_contains() {
 assert_contains "parent-sdk-release"
 assert_contains 'run-name: ${{ github.event.client_payload.release_id }}'
 assert_contains 'SOURCE_REF="${{ github.event.client_payload.source_ref }}"'
+assert_contains 'BUILD_NUMBER="${{ github.event.client_payload.build_number }}"'
+assert_contains 'SERVER_MARKETING_VERSION: ${{ steps.context.outputs.version }}'
+assert_contains 'SERVER_BUILD_NUMBER: ${{ steps.context.outputs.build_number }}'
 assert_contains '--source-ref "${{ steps.context.outputs.source_ref }}"'
 assert_contains 'refs/tags/release/sdk/$VERSION'
 assert_contains 'git push origin HEAD:main "$VERSION"'
 assert_contains 'Built from LookInside-Server@$SOURCE_REF'
 assert_contains 'without leading zeroes'
+assert_contains 'bash Scripts/run-gitleaks.sh .'
+assert_contains 'bash Scripts/scan-private-keys.sh "${assets[@]}"'
 
 echo "SDK release workflow tests passed"

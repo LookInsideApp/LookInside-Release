@@ -6,7 +6,7 @@ Pod::Spec.new do |s|
   s.license = { :type => "MIT" }
   s.authors = { "LookInside" => "support@lookinside-app.com" }
   s.source = { :git => "https://github.com/LookInsideApp/LookInside-Release.git", :tag => s.version.to_s }
-  s.ios.deployment_target = "13.0"
+  s.ios.deployment_target = "15.0"
   s.osx.deployment_target = "14.0"
   s.swift_versions = ["5.9"]
   s.vendored_frameworks = "LookInsideServer.xcframework"

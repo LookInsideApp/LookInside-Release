@@ -9,5 +9,6 @@ publish:
 test:
 	./Scripts/test-sign-and-notarize-app.sh
 	./Scripts/test-auth-server-release-workflow.sh
+	./Scripts/test-scan-private-keys.sh
 	./Scripts/test-sdk-release-workflow.sh
 	python3 ./Scripts/test-build-and-publish.py

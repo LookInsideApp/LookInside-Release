@@ -1,8 +1,13 @@
 # LookInside-Release
 
-This repo gives your app the LookInside debug server. Add it to the app you want to inspect, then open LookInside on your Mac.
+This repository gives your app the LookInside debug server. Add it to the app you want to inspect, then open LookInside on your Mac.
 
 Website: [lookinside-app.com](https://lookinside-app.com)
+
+## Requirements
+
+- iOS 15.0 or later, or macOS 14.0 or later
+- If your app supports iOS 13 or 14, use `0.2.9`.
 
 ## Swift Package Manager
 
@@ -61,11 +66,11 @@ LookInsideServer*
 | ---- | ------------ |
 | `LookInsideServer` | Starts the local debug server inside your app. |
 
-Use the latest semver tag from this repository.
+Replace `X.Y.Z` in the snippets above with the latest release version.
 
 ## Server Logging
 
-Set logging environment variables on the app target that embeds `LookInsideServer`, for example in Xcode through **Edit Scheme** -> **Run** -> **Arguments** -> **Environment Variables**. Leave these variables unset for normal debugging sessions.
+Set logging environment variables on the app target that embeds `LookInsideServer`, for example in Xcode through **Edit Scheme** → **Run** → **Arguments** → **Environment Variables**. Leave these variables unset for normal debugging sessions.
 
 ### `0.2.7` and later
 
