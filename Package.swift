@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "LookInside-Release",
     platforms: [
-        .iOS("13.0"),
+        .iOS("15.0"),
         .macOS("14.0"),
     ],
     products: [
