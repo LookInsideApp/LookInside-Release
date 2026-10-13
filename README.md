@@ -98,3 +98,7 @@ These versions do not support `LOOKINSIDE_SERVER_LOG_LEVEL`. Use `LOOKINSIDE_SER
 ## License
 
 Release binaries inherit their upstream license.
+
+## Sponsor
+
+This project is sponsored by [AirBuild](https://air.build/).
