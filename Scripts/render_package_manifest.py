@@ -63,13 +63,14 @@ def render_lookinside_server_podspec(
     return f"""Pod::Spec.new do |s|
   s.name = "LookInsideServer"
   s.version = {ruby_string(version)}
-  s.summary = "LookInside runtime server for debuggable iOS and macOS apps."
+  s.summary = "LookInside runtime server for debuggable iOS, tvOS and macOS apps."
   s.homepage = "https://github.com/LookInsideApp/LookInside-Release"
   s.license = {{ :type => "MIT" }}
   s.authors = {{ "LookInside" => "support@lookinside-app.com" }}
   s.source = {{ :git => {ruby_string(RELEASE_REPO_URL)}, :tag => s.version.to_s }}
   s.ios.deployment_target = "15.0"
   s.osx.deployment_target = "14.0"
+  s.tvos.deployment_target = "15.0"
   s.swift_versions = ["5.9"]
   s.vendored_frameworks = "LookInsideServer.xcframework"
   s.prepare_command = <<-CMD
@@ -257,6 +258,7 @@ let package = Package(
     platforms: [
         .iOS("15.0"),
         .macOS("14.0"),
+        .tvOS("15.0"),
     ],
     products: [
 {products_body}

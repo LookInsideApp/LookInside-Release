@@ -6,7 +6,8 @@ Website: [lookinside-app.com](https://lookinside-app.com)
 
 ## Requirements
 
-- iOS 15.0 or later, or macOS 14.0 or later
+- iOS 15.0 or later, macOS 14.0 or later, or tvOS 15.0 or later
+- tvOS needs `1.2.0` or later; earlier releases ship iOS and macOS only.
 - If your app supports iOS 13 or 14, use `0.2.9`.
 
 ## Swift Package Manager
