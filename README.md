@@ -6,8 +6,9 @@ Website: [lookinside-app.com](https://lookinside-app.com)
 
 ## Requirements
 
-- iOS 15.0 or later, macOS 14.0 or later, or tvOS 15.0 or later
-- tvOS needs `1.2.0` or later; earlier releases ship iOS and macOS only.
+- iOS 15.0 or later, macOS 14.0 or later, tvOS 15.0 or later, or watchOS 10.0 or later
+- tvOS and watchOS need `1.2.0` or later; earlier releases ship iOS and macOS only.
+- On watchOS the server runs in the watchOS 26 Simulator and later. On a real Apple Watch it links but stays idle: watchOS does not let an app accept the connection LookInside makes.
 - If your app supports iOS 13 or 14, use `0.2.9`.
 
 ## Swift Package Manager
